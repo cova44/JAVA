@@ -1,1 +1,134 @@
-# JAVA
+# 
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wochenzettel Pro</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+
+<style>
+body { font-family: Arial; margin: 0; background: #f4f4f4; }
+header { background: #333; color: white; padding: 10px; text-align: center; }
+.day { background: white; margin: 10px; padding: 10px; border-radius: 10px; }
+input, button { width: 100%; margin-top: 5px; padding: 10px; }
+.total { font-weight: bold; text-align: center; margin: 10px; }
+</style>
+</head>
+
+<body>
+
+<header>📅 Wochenzettel Pro</header>
+
+<div id="login">
+  <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Passwort">
+  <button onclick="login()">Login / Registrieren</button>
+</div>
+
+<div id="app" style="display:none;">
+  <div class="total" id="totalHours"></div>
+  <div id="week"></div>
+</div>
+
+<script>
+// 🔴 HIER DEINE FIREBASE DATEN EINSETZEN
+const firebaseConfig = {
+  apiKey: "DEIN_KEY",
+  authDomain: "DEIN_DOMAIN",
+  projectId: "DEIN_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const days = ["Mo","Di","Mi","Do","Fr","Sa","So"];
+
+let userId = null;
+
+function login() {
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("password").value;
+
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(() => {
+      auth.createUserWithEmailAndPassword(email, pass);
+    });
+}
+
+auth.onAuthStateChanged(user => {
+  if (user) {
+    userId = user.uid;
+    document.getElementById("login").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    loadData();
+  }
+});
+
+async function loadData() {
+  const doc = await db.collection("users").doc(userId).get();
+  const data = doc.exists ? doc.data() : {};
+  render(data);
+}
+
+async function saveData(data) {
+  await db.collection("users").doc(userId).set(data);
+}
+
+function render(data) {
+  const container = document.getElementById("week");
+  container.innerHTML = "";
+
+  let total = 0;
+
+  days.forEach(day => {
+    const div = document.createElement("div");
+    div.className = "day";
+
+    div.innerHTML = `<h3>${day}</h3>`;
+
+    (data[day] || []).forEach(e => {
+      total += Number(e.hours);
+      div.innerHTML += `<p>🛠 ${e.text} (${e.hours}h)</p>`;
+    });
+
+    const input = document.createElement("input");
+    input.placeholder = "Was gemacht?";
+
+    const hours = document.createElement("input");
+    hours.placeholder = "Stunden";
+    hours.type = "number";
+
+    const btn = document.createElement("button");
+    btn.innerText = "➕ Hinzufügen";
+
+    btn.onclick = async () => {
+      if (!input.value) return;
+
+      const entry = { text: input.value, hours: hours.value || 0 };
+
+      if (!data[day]) data[day] = [];
+      data[day].push(entry);
+
+      await saveData(data);
+      render(data);
+    };
+
+    div.appendChild(input);
+    div.appendChild(hours);
+    div.appendChild(btn);
+
+    container.appendChild(div);
+  });
+
+  document.getElementById("totalHours").innerText =
+    "⏱ Gesamtstunden: " + total + "h";
+}
+</script>
+
+</body>
+</html>
